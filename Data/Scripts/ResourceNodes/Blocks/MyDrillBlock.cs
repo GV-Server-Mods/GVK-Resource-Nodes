@@ -217,7 +217,7 @@ namespace ResourceNodes
         private void AssignNewMaterial()
         {
             //get all the materials
-            for(int i = 0; i < 30; i++)
+            for(int i = 0; i < 60; i++)
             {
                 List<MyVoxelBase> detected = new List<MyVoxelBase>();
                 Vector3D position = Block.PositionComp.GetPosition() + Block.PositionComp.WorldMatrixRef.Down * i * 3;
