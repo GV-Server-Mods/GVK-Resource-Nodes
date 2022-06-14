@@ -187,6 +187,7 @@ namespace ResourceNodes
             Block.Components.Add<MyInventoryBase>(component);
 
             UpdateMultipliers();
+            UpdateInGround();
         }
 
         public override void GameUpdate()
@@ -196,12 +197,13 @@ namespace ResourceNodes
                 return;
             }
 
-            tick++;
-
             if (!functionalBlock.CubeGrid.IsStatic)
             {
                 functionalBlock.Enabled = false;
+                return;
             }
+            
+            tick++;
 
             if (tick % ProductionRateUpdateRate == tickSmear)
             {
