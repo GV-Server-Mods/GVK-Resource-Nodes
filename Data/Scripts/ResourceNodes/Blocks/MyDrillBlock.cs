@@ -26,7 +26,7 @@ namespace ResourceNodes
         private const double RateInSeconds = TickRate / 60d;
         private const float EncroachmentDistance = 50f; // Distance to other miner mining same ore
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
-        private const int ProductionRateUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
+        private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
 
         private ulong tick;
         private uint tickSmear;
@@ -205,7 +205,7 @@ namespace ResourceNodes
             
             tick++;
 
-            if (tick % ProductionRateUpdateRate == tickSmear)
+            if (tick % ResourceUpdateRate == tickSmear)
             {
                 UpdateInGround();
             }
@@ -450,7 +450,7 @@ namespace ResourceNodes
             builder.AppendLine();
             if (State.penalty < 1.0f)
             {
-                builder.AppendLine("Mining rates reduced! A block is mining the same ore nearby");
+                builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
                 builder.AppendLine();
             }
 
