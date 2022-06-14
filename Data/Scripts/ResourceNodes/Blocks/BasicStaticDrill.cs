@@ -42,7 +42,7 @@ namespace ResourceNodes
             DepositedResources += TickEmissive;
             BaseOrePerSecond = level * 2; //111 Si per min //15
             InvMultiplier = 2;
-            BasePowerConsumptionMultiplier = 5f;
+            BasePowerMW = 0.5f;
         }
 
         public override bool LoadSubparts()

@@ -15,6 +15,7 @@ namespace Math0424.Networking
         [ProtoMember(3)] public bool isProducing;
         [ProtoMember(4)] public bool invFull;
         [ProtoMember(5)] public string oreName;
+        [ProtoMember(6)] public float penalty;
 
 
         public int GetId()
