@@ -13,8 +13,9 @@ namespace ResourceNodes
     {
 
         public List<string> MiningBlacklist = new List<string>();
-        public Dictionary<string, HashSet<long>> Miners = new Dictionary<string, HashSet<long>>();
+        public Dictionary<string, List<long>> Miners = new Dictionary<string, List<long>>();
         public Dictionary<long, Vector3D> Locations = new Dictionary<long, Vector3D>();
+        public Dictionary<string, uint> Generation = new Dictionary<string, uint>();
 
         public EasyNetworker Network;
         public string ModPath;
