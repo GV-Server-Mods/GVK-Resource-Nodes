@@ -36,17 +36,17 @@ namespace Math0424.Networking
                     if (d != null)
                     {
                         d.IsProducing = isProducing;
-                        d.state = this;
+                        d.State = this;
                     } 
                     else if (d1 != null)
                     {
                         d1.IsProducing = isProducing;
-                        d1.state = this;
+                        d1.State = this;
                     }
                     else if (d2 != null)
                     {
                         d2.IsProducing = isProducing;
-                        d2.state = this;
+                        d2.State = this;
                     }
                 }
             }
