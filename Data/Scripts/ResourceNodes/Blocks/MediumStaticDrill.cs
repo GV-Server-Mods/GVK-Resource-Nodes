@@ -41,7 +41,7 @@ namespace ResourceNodes
             DepositedResources += TickEmissive;
             BaseOrePerSecond = level * 2; //10
             InvMultiplier = 4;
-            BasePowerConsumptionMultiplier = 20f;
+            BasePowerMW = 0.8f;
         }
 
         public override bool LoadSubparts()
