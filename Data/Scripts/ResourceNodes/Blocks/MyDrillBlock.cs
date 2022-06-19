@@ -39,6 +39,7 @@ namespace ResourceNodes
         private float penaltyFactor;
         private int minerProxyId = -1;
         private MyVoxelMaterialDefinition currentOre;
+        private float allowedDistanceToGround;
 
         public bool IsProducing;
         protected Action DepositedResources;
@@ -58,6 +59,10 @@ namespace ResourceNodes
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
             LoadOntoBlock();
+            var cubeSize = Block.BlockDefinition.CubeSize == MyCubeSize.Large
+                ? 2.5f
+                : 0.5f;
+            allowedDistanceToGround = Block.BlockDefinition.Size.Y * cubeSize / 2f + 0.25f;
             Block.UpgradeValues.Add("Productivity", 0f);
             Block.UpgradeValues.Add("Effectiveness", 1f);
             Block.UpgradeValues.Add("PowerEfficiency", 1f);
@@ -202,7 +207,7 @@ namespace ResourceNodes
                 functionalBlock.Enabled = false;
                 return;
             }
-            
+
             tick++;
 
             if (tick % ResourceUpdateRate == tickSmear)
@@ -340,7 +345,7 @@ namespace ResourceNodes
             materials.Clear();
             var detected = new List<MyVoxelBase>();
             var position = Block.PositionComp.GetPosition() +
-                           Block.PositionComp.WorldMatrixRef.Down * (Block.BlockDefinition.Size.Y + .25);
+                           Block.PositionComp.WorldMatrixRef.Down * allowedDistanceToGround;
             var boundingSphereD = new BoundingSphereD(position, 2);
             MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
             foreach (var map in detected)
