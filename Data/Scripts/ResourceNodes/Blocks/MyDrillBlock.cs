@@ -230,10 +230,8 @@ namespace ResourceNodes
                 UpdateMultipliers();
             }
 
-            if (needsUpdate || tick % 10 == 0)
+            if (tick % 10 == 0)
             {
-                UpdateIsProducing();
-
                 var packet = new DrillStateUpdate
                 {
                     penalty = penaltyFactor,
@@ -281,17 +279,19 @@ namespace ResourceNodes
                 }
             }
 
+            if (tick % TickRate != tickResource)
+            {
+                return;
+            }
+
+            UpdateIsProducing();
+
             if (!IsProducing)
             {
                 return;
             }
 
             if (currentOre == null)
-            {
-                return;
-            }
-
-            if (tick % TickRate != tickResource)
             {
                 return;
             }
