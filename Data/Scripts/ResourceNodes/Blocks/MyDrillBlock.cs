@@ -467,12 +467,12 @@ namespace ResourceNodes
             {
                 builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
                 builder.AppendLine();
-                builder.AppendFormat("Production Multiplier: {0:P2}",
-                    (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
-                builder.AppendLine();
             }
 
-            builder.AppendFormat("Currently extracting: ");
+            builder.AppendFormat("Production Multiplier: {0:P2}",
+                (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
+            builder.AppendLine();
+            builder.AppendFormat("Detected Ore: ");
             builder.AppendLine(string.IsNullOrEmpty(State.oreName) ? "nothing" : State.oreName);
             builder.Append("Is producing: ");
             builder.AppendLine(State.isProducing.ToString());
