@@ -9,10 +9,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.EntityComponents;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
+using VRage.Game.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.Voxels;
 using VRageMath;
@@ -28,8 +30,9 @@ namespace ResourceNodes
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
 
-        private ulong tick;
-        private uint tickSmear;
+        private int tick;
+        private int tickResource;
+        private int tickGroundUpdate;
         private float yieldMultiplier = 1;
 
         private IMyFunctionalBlock functionalBlock;
@@ -72,14 +75,21 @@ namespace ResourceNodes
             Block.OnClose += RemoveFromMiners;
             functionalBlock.AppendingCustomInfo += CustomInfo;
             Block.OnUpgradeValuesChanged += MarkForUpdate;
+            functionalBlock.IsWorkingChanged += MarkForUpdate;
 
-            tickSmear = (uint)Math.Abs(GetHashCode() % TickRate);
+            tickResource = Math.Abs(GetHashCode() % TickRate);
+            tickGroundUpdate = Math.Abs(GetHashCode() % ResourceUpdateRate);
             BlockInit();
         }
 
         private bool IsProjection()
         {
             return Block != null && Block.CubeGrid.Physics == null;
+        }
+
+        private void MarkForUpdate(IMyCubeBlock obj)
+        {
+            MarkForUpdate();
         }
 
         private void MarkForUpdate()
@@ -97,7 +107,7 @@ namespace ResourceNodes
             UpdatePenaltyFactor();
 
             Dictionary<string, float> v = Block.UpgradeValues;
-            yieldMultiplier = (v["Productivity"] + v["Effectiveness"]) * penaltyFactor;
+            yieldMultiplier = (v["Productivity"] + v["Effectiveness"]) * (1 - penaltyFactor);
             IMyShipDrill drill = Block as IMyShipDrill;
             if (drill != null)
             {
@@ -121,7 +131,7 @@ namespace ResourceNodes
                 return;
             }
 
-            penaltyFactor = 1;
+            penaltyFactor = 0;
 
             var nearby = new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance);
             List<MyDrillBlock> nearbyDrills = new List<MyDrillBlock>();
@@ -137,7 +147,7 @@ namespace ResourceNodes
                     continue;
                 }
 
-                penaltyFactor *= EncroachmentPenalty;
+                penaltyFactor += (1 - penaltyFactor) * EncroachmentPenalty;
             }
 
             MarkForUpdate();
@@ -208,9 +218,9 @@ namespace ResourceNodes
                 return;
             }
 
-            tick++;
+            tick = MyAPIGateway.Session.GameplayFrameCounter;
 
-            if (tick % ResourceUpdateRate == tickSmear)
+            if (tick % ResourceUpdateRate == tickGroundUpdate)
             {
                 UpdateInGround();
             }
@@ -220,10 +230,10 @@ namespace ResourceNodes
                 UpdateMultipliers();
             }
 
-            UpdateIsProducing();
-
-            if (tick % 10 == 0)
+            if (needsUpdate || tick % 10 == 0)
             {
+                UpdateIsProducing();
+
                 var packet = new DrillStateUpdate
                 {
                     penalty = penaltyFactor,
@@ -281,7 +291,7 @@ namespace ResourceNodes
                 return;
             }
 
-            if (tick % TickRate != tickSmear)
+            if (tick % TickRate != tickResource)
             {
                 return;
             }
@@ -453,17 +463,17 @@ namespace ResourceNodes
 
             builder.Clear();
             builder.AppendLine();
-            if (State.penalty < 1.0f)
+            if (State.isProducing && State.penalty > float.Epsilon)
             {
                 builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
                 builder.AppendLine();
+                builder.AppendFormat("Production Multiplier: {0:P2}",
+                    (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
+                builder.AppendLine();
             }
 
-            var pMul = (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * State.penalty;
-            builder.AppendFormat("Production Multiplier: {0:P2}", pMul);
-            builder.AppendLine();
             builder.AppendFormat("Currently extracting: ");
-            builder.AppendLine(State.oreName);
+            builder.AppendLine(string.IsNullOrEmpty(State.oreName) ? "nothing" : State.oreName);
             builder.Append("Is producing: ");
             builder.AppendLine(State.isProducing.ToString());
             builder.Append("In ground: ");
