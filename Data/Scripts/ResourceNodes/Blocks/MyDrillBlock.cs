@@ -463,14 +463,21 @@ namespace ResourceNodes
 
             builder.Clear();
             builder.AppendLine();
-            if (State.isProducing && State.penalty > float.Epsilon)
+            if (State.isProducing)
             {
-                builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
+                if (State.penalty > float.Epsilon)
+                {
+                    builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
+                    builder.AppendLine();
+                }
+
+                builder.AppendFormat("Production Multiplier: {0:P2}",
+                    (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
                 builder.AppendLine();
             }
 
-            builder.AppendFormat("Production Multiplier: {0:P2}",
-                (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
+            builder.AppendFormat("Effectiveness: {0:P2}",
+                block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]);
             builder.AppendLine();
             builder.AppendFormat("Detected Ore: ");
             builder.AppendLine(string.IsNullOrEmpty(State.oreName) ? "nothing" : State.oreName);
