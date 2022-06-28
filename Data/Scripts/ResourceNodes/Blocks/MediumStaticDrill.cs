@@ -39,9 +39,9 @@ namespace ResourceNodes
         public override void BlockInit()
         {
             DepositedResources += TickEmissive;
-            BaseOrePerSecond = level * 2; //10
-            InvMultiplier = 4;
-            BasePowerMW = 0.8f;
+            BaseOrePerSecond = 12.5f; // Half of an advanced
+            InvMultiplier = 4; // 4kL
+            BasePowerMW = 1.25f; // Half of an advanced
         }
 
         public override bool LoadSubparts()

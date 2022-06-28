@@ -9,12 +9,17 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using ParallelTasks;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.EntityComponents;
 using VRage;
+using VRage.Collections;
 using VRage.Game;
+using VRage.Game.Entities;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using VRage.Game.ObjectBuilders.ComponentSystem;
+using VRage.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.Voxels;
 using VRageMath;
@@ -22,6 +27,30 @@ using IMyInventory = VRage.Game.ModAPI.IMyInventory;
 
 namespace ResourceNodes
 {
+    internal class MinerWorkData : WorkData
+    {
+        public BoundingSphereD Nearby;
+        public List<MyDrillBlock> Drills = new List<MyDrillBlock>();
+
+        public MinerWorkData(BoundingSphereD nearby)
+        {
+            Nearby = nearby;
+        }
+    }
+
+    internal class MaterialScanWorkData : WorkData
+    {
+        public readonly Dictionary<byte, int> Materials = new Dictionary<byte, int>();
+        public string Ore;
+        public float Ratio;
+
+        public MaterialScanWorkData(string currentOre, float currentOreRatio)
+        {
+            Ore = currentOre;
+            Ratio = currentOreRatio;
+        }
+    }
+
     internal abstract class MyDrillBlock : MyAbstractAnimatedBlock
     {
         private const int TickRate = 3 * 60; // Every 3 seconds
@@ -29,6 +58,9 @@ namespace ResourceNodes
         private const float EncroachmentDistance = 50f; // Distance to other miner mining same ore
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
+
+        private static readonly Guid StorageGuid = new Guid("80B6388C-EE37-4C8D-B0E3-2272E3892901");
+        private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
 
         private int tick;
         private int tickResource;
@@ -41,19 +73,21 @@ namespace ResourceNodes
         private bool needsUpdate;
         private float penaltyFactor;
         private int minerProxyId = -1;
-        private MyVoxelMaterialDefinition currentOre;
+        private string currentOre;
+        private float currentOreRatio;
+        private MyObjectBuilder_Ore oreObject;
         private float allowedDistanceToGround;
 
         public bool IsProducing;
         protected Action DepositedResources;
 
         protected int InvMultiplier = 8;
-        protected int BaseOrePerSecond = 1;
+        protected float BaseOrePerSecond = 1;
         protected float BasePowerMW = 1f;
 
-        private readonly Dictionary<byte, int> materials = new Dictionary<byte, int>();
+        private Task? groundScanTask = null;
 
-        public DrillStateUpdate State;
+        private int lastUpdateTick;
 
         private IMyInventory Inv => functionalBlock.GetInventory(0);
 
@@ -72,10 +106,10 @@ namespace ResourceNodes
 
             functionalBlock = (IMyFunctionalBlock)Block;
 
-            Block.OnClose += RemoveFromMiners;
+            Block.OnMarkForClose += RemoveFromMiners;
             functionalBlock.AppendingCustomInfo += CustomInfo;
             Block.OnUpgradeValuesChanged += MarkForUpdate;
-            functionalBlock.IsWorkingChanged += MarkForUpdate;
+            functionalBlock.IsWorkingChanged += OnWorkingChanged;
 
             tickResource = Math.Abs(GetHashCode() % TickRate);
             tickGroundUpdate = Math.Abs(GetHashCode() % ResourceUpdateRate);
@@ -87,8 +121,9 @@ namespace ResourceNodes
             return Block != null && Block.CubeGrid.Physics == null;
         }
 
-        private void MarkForUpdate(IMyCubeBlock obj)
+        private void OnWorkingChanged(IMyCubeBlock obj)
         {
+            lastUpdateTick = MyAPIGateway.Session.GameplayFrameCounter;
             MarkForUpdate();
         }
 
@@ -104,53 +139,64 @@ namespace ResourceNodes
                 return;
             }
 
-            UpdatePenaltyFactor();
-
-            Dictionary<string, float> v = Block.UpgradeValues;
-            yieldMultiplier = (v["Productivity"] + v["Effectiveness"]) * (1 - penaltyFactor);
-            IMyShipDrill drill = Block as IMyShipDrill;
-            if (drill != null)
-            {
-                MyResourceSinkComponent resourceSink;
-                if (drill.Components.TryGet(out resourceSink))
-                {
-                    var modifier = 1 * (1 + v["Productivity"]) * (1f / v["PowerEfficiency"]) *
-                                   (1f / v["Effectiveness"]);
-                    resourceSink.SetMaxRequiredInputByType(MyResourceDistributorComponent.ElectricityId,
-                        BasePowerMW * modifier);
-                }
-            }
-
-            needsUpdate = false;
-        }
-
-        private void UpdatePenaltyFactor()
-        {
-            if (string.IsNullOrEmpty(currentOre?.MinedOre))
+            if (string.IsNullOrEmpty(currentOre))
             {
                 return;
             }
 
-            penaltyFactor = 0;
+            var data = new MinerWorkData(new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance));
 
-            var nearby = new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance);
-            List<MyDrillBlock> nearbyDrills = new List<MyDrillBlock>();
-            GetAllDrillsInSphere(nearby, nearbyDrills);
-
-            foreach (var other in nearbyDrills)
+            MyAPIGateway.Parallel.Start(d =>
             {
-                if (other.MarkedForClose ||
-                    other.Entity.EntityId == Entity.EntityId ||
-                    other.currentOre?.MinedOre != currentOre?.MinedOre ||
-                    !other.IsProducing)
+                var minerData = (MinerWorkData)d;
+                GetAllDrillsInSphere(minerData.Nearby, minerData.Drills);
+            }, d =>
+            {
+                var minerData = (MinerWorkData)d;
+                penaltyFactor = 0;
+                foreach (var other in minerData.Drills)
                 {
-                    continue;
+                    if (other == null || other.MarkedForClose || other.Closed ||
+                        other.Entity.EntityId == Entity.EntityId ||
+                        other.currentOre != currentOre ||
+                        !other.IsProducing)
+                    {
+                        continue;
+                    }
+
+                    penaltyFactor += (1 - penaltyFactor) * EncroachmentPenalty;
                 }
 
-                penaltyFactor += (1 - penaltyFactor) * EncroachmentPenalty;
-            }
+                var productivity = Block.UpgradeValues["Productivity"];
+                var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f;
+                var powerEfficiency = (Block.UpgradeValues["PowerEfficiency"] - 1f) * 3f + 1f;
 
-            MarkForUpdate();
+                yieldMultiplier = (productivity + effectiveness) * (1 - penaltyFactor);
+                var drill = Block as IMyShipDrill;
+                if (drill == null)
+                {
+                    return;
+                }
+
+                MyResourceSinkComponent sink;
+                if (!drill.Components.TryGet(out sink))
+                {
+                    return;
+                }
+
+                var modifier = 1 * (1 + productivity) * (1f / powerEfficiency) * (1f / effectiveness);
+                var oldPower = sink.MaxRequiredInputByType(Electricity);
+                var newPower = BasePowerMW * modifier;
+                if (Math.Abs(oldPower - newPower) < float.Epsilon)
+                {
+                    return;
+                }
+
+                sink.SetRequiredInputByType(Electricity, 0.002f);
+                sink.SetMaxRequiredInputByType(Electricity, newPower);
+                sink.SetRequiredInputFuncByType(Electricity, () => Block.IsWorking ? BasePowerMW * modifier : 0.002f);
+                sink.Update();
+            }, data);
         }
 
         private static void GetAllDrillsInSphere(BoundingSphereD sphere, List<MyDrillBlock> result)
@@ -165,7 +211,7 @@ namespace ResourceNodes
                     continue;
                 }
 
-                if (drill.MarkedForClose ||
+                if (drill.MarkedForClose || drill.Closed ||
                     Vector3D.Distance(sphere.Center, drill.Block.PositionComp.GetPosition()) > EncroachmentDistance)
                 {
                     result.RemoveAtFast(i);
@@ -202,15 +248,14 @@ namespace ResourceNodes
             Block.Components.Add<MyInventoryBase>(component);
 
             UpdateMultipliers();
-            UpdateInGround();
+            groundScanTask = UpdateInGround();
         }
 
         public override void GameUpdate()
         {
-            if (!MyAPIGateway.Session.IsServer)
-            {
-                return;
-            }
+            tick = MyAPIGateway.Session.GameplayFrameCounter;
+            var updateThisTick = needsUpdate;
+            needsUpdate = false;
 
             if (!functionalBlock.CubeGrid.IsStatic)
             {
@@ -218,19 +263,26 @@ namespace ResourceNodes
                 return;
             }
 
-            tick = MyAPIGateway.Session.GameplayFrameCounter;
-
             if (tick % ResourceUpdateRate == tickGroundUpdate)
             {
-                UpdateInGround();
+                if (!MyAPIGateway.Session.IsServer || (groundScanTask != null && string.IsNullOrEmpty(currentOre)))
+                {
+                    return;
+                }
+
+                groundScanTask = UpdateInGround();
             }
 
-            if (needsUpdate && !string.IsNullOrEmpty(currentOre?.MinedOre))
+            if (updateThisTick && !string.IsNullOrEmpty(currentOre))
             {
                 UpdateMultipliers();
+                if (!MyAPIGateway.Session.IsServer)
+                {
+                    return;
+                }
             }
 
-            if (tick % 10 == 0)
+            if (tick % 10 == 0 || updateThisTick)
             {
                 var packet = new DrillStateUpdate
                 {
@@ -238,8 +290,9 @@ namespace ResourceNodes
                     blockId = Block.EntityId,
                     isInGround = inGround,
                     invFull = invFull,
-                    oreName = currentOre?.MinedOre ?? "nothing",
-                    isProducing = IsProducing
+                    oreName = string.IsNullOrEmpty(currentOre) ? "nothing" : currentOre,
+                    isProducing = IsProducing,
+                    forceUpdate = updateThisTick
                 };
                 ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet,
                     1500, false);
@@ -268,7 +321,7 @@ namespace ResourceNodes
                     {
                         SetEmissive(Color.Red);
                     }
-                    else if (currentOre != null)
+                    else if (!string.IsNullOrEmpty(currentOre))
                     {
                         SetEmissive(Color.Aqua);
                     }
@@ -279,7 +332,7 @@ namespace ResourceNodes
                 }
             }
 
-            if (tick % TickRate != tickResource)
+            if (!updateThisTick && tick % TickRate != tickResource)
             {
                 return;
             }
@@ -291,14 +344,16 @@ namespace ResourceNodes
                 return;
             }
 
-            if (currentOre == null)
+            if (oreObject == null)
             {
                 return;
             }
 
-            var oreObject = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Ore>(currentOre.MinedOre);
+            var periodMul = ((float)tick - lastUpdateTick) / TickRate;
+            var amount = BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier;
+            amount *= periodMul;
+            lastUpdateTick = tick;
 
-            var amount = BaseOrePerSecond * currentOre.MinedOreRatio * RateInSeconds * yieldMultiplier;
             invFull = !Inv.CanItemsBeAdded((MyFixedPoint)amount, oreObject);
 
             if (invFull)
@@ -307,6 +362,7 @@ namespace ResourceNodes
             }
 
             Inv.AddItems((MyFixedPoint)amount, oreObject);
+
             DepositedResources?.Invoke();
         }
 
@@ -323,10 +379,9 @@ namespace ResourceNodes
 
             if (IsProducing)
             {
-                IsProducing = Block.ResourceSink.IsPoweredByType(MyResourceDistributorComponent.ElectricityId) &&
-                              Block.ResourceSink.IsPowerAvailable(MyResourceDistributorComponent.ElectricityId,
-                                  Block.ResourceSink.MaxRequiredInputByType(
-                                      MyResourceDistributorComponent.ElectricityId));
+                IsProducing = Block.ResourceSink.IsPoweredByType(Electricity) &&
+                              Block.ResourceSink.IsPowerAvailable(Electricity,
+                                  Block.ResourceSink.MaxRequiredInputByType(Electricity));
             }
 
             if (wasProducing == IsProducing)
@@ -345,32 +400,46 @@ namespace ResourceNodes
             }
         }
 
-        private void UpdateInGround()
+        private Task? UpdateInGround()
         {
             if (IsProjection())
             {
-                return;
+                return null;
             }
 
-            materials.Clear();
-            var detected = new List<MyVoxelBase>();
-            var position = Block.PositionComp.GetPosition() +
-                           Block.PositionComp.WorldMatrixRef.Down * allowedDistanceToGround;
-            var boundingSphereD = new BoundingSphereD(position, 2);
-            MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
-            foreach (var map in detected)
-            {
-                GetResources(position, map);
-            }
+            var data = new MaterialScanWorkData(currentOre, currentOreRatio);
 
-            inGround = materials.Count >= 1;
-            if (inGround)
+            return MyAPIGateway.Parallel.Start(d =>
             {
-                AssignNewMaterial();
-            }
+                var materialData = (MaterialScanWorkData)d;
+                var detected = new List<MyVoxelBase>();
+                var position = Block.PositionComp.GetPosition() +
+                               Block.PositionComp.WorldMatrixRef.Down * allowedDistanceToGround;
+                var boundingSphereD = new BoundingSphereD(position, 2);
+                MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
+                foreach (var map in detected)
+                {
+                    GetResources(position, map, materialData);
+                }
+
+                if (materialData.Materials.Count >= 1)
+                {
+                    AssignNewMaterial(materialData);
+                }
+            }, d =>
+            {
+                var materialData = (MaterialScanWorkData)d;
+                inGround = materialData.Materials.Count >= 1;
+                currentOre = materialData.Ore;
+                currentOreRatio = materialData.Ratio;
+                oreObject = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Ore>(currentOre);
+                UpdateNearbyDrills(Block.EntityId);
+                MarkForUpdate();
+                groundScanTask = null;
+            }, data);
         }
 
-        private void AssignNewMaterial()
+        private void AssignNewMaterial(MaterialScanWorkData data)
         {
             //get all the materials
             for (var i = 0; i < 60; i++)
@@ -381,15 +450,15 @@ namespace ResourceNodes
                 MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
                 foreach (var map in detected)
                 {
-                    GetResources(position, map);
+                    GetResources(position, map, data);
                 }
             }
 
             //sort materials and pick ores
             var options = new Dictionary<MyVoxelMaterialDefinition, int>();
-            foreach (var m in materials.Keys)
+            foreach (var mat in data.Materials)
             {
-                var def = MyDefinitionManager.Static.GetVoxelMaterialDefinition(m);
+                var def = MyDefinitionManager.Static.GetVoxelMaterialDefinition(mat.Key);
                 if (def == null)
                 {
                     continue;
@@ -398,13 +467,13 @@ namespace ResourceNodes
                 if (def.CanBeHarvested && def.IsRare && !string.IsNullOrEmpty(def.MinedOre) &&
                     !ResourceNode.Instance.MiningBlacklist.Contains(def.MinedOre))
                 {
-                    options.Add(def, materials[m]);
+                    options.Add(def, mat.Value);
                 }
             }
 
-            if (options.Count == 0 && materials.Count >= 1)
+            if (options.Count == 0)
             {
-                foreach (var material in materials)
+                foreach (var material in data.Materials)
                 {
                     var def = MyDefinitionManager.Static.GetVoxelMaterialDefinition(material.Key);
                     if (def != null)
@@ -428,65 +497,46 @@ namespace ResourceNodes
                 }
             }
 
-            if (currentOre?.MinedOre == top?.MinedOre)
+            if (top == null || data.Ore == top.MinedOre)
             {
                 return;
             }
 
-            currentOre = top;
-
-            var nearby = new BoundingSphereD(Block.PositionComp.GetPosition(), (double)EncroachmentDistance);
-            List<MyDrillBlock> nearbyDrills = new List<MyDrillBlock>();
-            GetAllDrillsInSphere(nearby, nearbyDrills);
-
-            foreach (var other in nearbyDrills)
-            {
-                if (other.MarkedForClose ||
-                    other.Entity.EntityId == Entity.EntityId ||
-                    other.currentOre?.MinedOre != currentOre?.MinedOre)
-                {
-                    continue;
-                }
-
-                other.MarkForUpdate();
-            }
-
-            MarkForUpdate();
+            data.Ore = top.MinedOre;
+            data.Ratio = top.MinedOreRatio;
         }
 
         private void CustomInfo(IMyTerminalBlock block, StringBuilder builder)
         {
-            if (State == null)
-            {
-                return;
-            }
-
             builder.Clear();
             builder.AppendLine();
-            if (State.isProducing)
+
+            var productivity = Block.UpgradeValues["Productivity"];
+            var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1) * 3f + 1;
+
+            if (IsProducing)
             {
-                if (State.penalty > float.Epsilon)
+                if (penaltyFactor > float.Epsilon)
                 {
                     builder.AppendLine("Mining rates reduced! A nearby block is mining the same ore.");
                     builder.AppendLine();
                 }
 
                 builder.AppendFormat("Production Multiplier: {0:P2}",
-                    (block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]) * (1 - State.penalty));
+                    (productivity + effectiveness) * (1 - penaltyFactor));
                 builder.AppendLine();
             }
 
-            builder.AppendFormat("Effectiveness: {0:P2}",
-                block.UpgradeValues["Productivity"] + block.UpgradeValues["Effectiveness"]);
+            builder.AppendFormat("Effectiveness: {0:P2}", productivity + effectiveness);
             builder.AppendLine();
             builder.AppendFormat("Detected Ore: ");
-            builder.AppendLine(string.IsNullOrEmpty(State.oreName) ? "nothing" : State.oreName);
+            builder.AppendLine(string.IsNullOrEmpty(currentOre) ? "nothing" : currentOre);
             builder.Append("Is producing: ");
-            builder.AppendLine(State.isProducing.ToString());
+            builder.AppendLine(IsProducing.ToString());
             builder.Append("In ground: ");
-            builder.AppendLine(State.isInGround.ToString());
+            builder.AppendLine(inGround.ToString());
             builder.Append("Inventory full: ");
-            builder.Append(State.invFull.ToString());
+            builder.Append(invFull.ToString());
         }
 
         private void RemoveFromMiners(MyEntity e)
@@ -502,52 +552,53 @@ namespace ResourceNodes
                 return;
             }
 
-            var nearby = new BoundingSphereD(e.PositionComp.GetPosition(), EncroachmentDistance);
-            List<MyDrillBlock> nearbyDrills = new List<MyDrillBlock>();
-            GetAllDrillsInSphere(nearby, nearbyDrills);
-
-            foreach (var other in nearbyDrills)
-            {
-                if (other.MarkedForClose || other.Entity.EntityId == e.EntityId ||
-                    other.currentOre?.MinedOre != currentOre?.MinedOre)
-                {
-                    continue;
-                }
-
-                other.MarkForUpdate();
-            }
+            UpdateNearbyDrills(e.EntityId);
         }
 
         private void AddToMiners()
         {
-            if (string.IsNullOrEmpty(currentOre?.MinedOre) || IsProjection())
+            if (string.IsNullOrEmpty(currentOre) || IsProjection())
             {
                 return;
             }
 
-            var nearby = new BoundingSphereD(Block.PositionComp.GetPosition(), (double)EncroachmentDistance);
             if (minerProxyId == -1) // Add to the tree since it doesn't already exist
             {
-                BoundingBoxD boundingBoxD = BoundingBoxD.CreateFromSphere(nearby);
-                minerProxyId = ResourceNode.Instance.MinerTree.AddProxy(ref boundingBoxD, this, 0U, true);
+                var loc = new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance);
+                var boundingBox = BoundingBoxD.CreateFromSphere(loc);
+                minerProxyId = ResourceNode.Instance.MinerTree.AddProxy(ref boundingBox, this, 0U, true);
             }
 
-            List<MyDrillBlock> nearbyDrills = new List<MyDrillBlock>();
-            GetAllDrillsInSphere(nearby, nearbyDrills);
-
-            foreach (var other in nearbyDrills)
-            {
-                if (other.MarkedForClose || other.Entity.EntityId == Entity.EntityId ||
-                    other.currentOre?.MinedOre != currentOre?.MinedOre)
-                {
-                    continue;
-                }
-
-                other.MarkForUpdate();
-            }
+            UpdateNearbyDrills(Block.EntityId);
         }
 
-        private void GetResources(Vector3D pos, MyVoxelBase map)
+        private void UpdateNearbyDrills(long entityId)
+        {
+            var data = new MinerWorkData(new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance));
+
+            MyAPIGateway.Parallel.Start(d =>
+            {
+                var minerData = (MinerWorkData)d;
+                GetAllDrillsInSphere(minerData.Nearby, minerData.Drills);
+            }, d =>
+            {
+                var minerData = (MinerWorkData)d;
+
+                foreach (var other in minerData.Drills)
+                {
+                    if (other == null || other.MarkedForClose || other.Closed ||
+                        other.Entity.EntityId == entityId ||
+                        other.currentOre != currentOre)
+                    {
+                        continue;
+                    }
+
+                    other.MarkForUpdate();
+                }
+            }, data);
+        }
+
+        private void GetResources(Vector3D pos, MyVoxelBase map, MaterialScanWorkData data)
         {
             var cache = new MyStorageData(MyStorageDataTypeFlags.ContentAndMaterial);
             cache.Resize(new Vector3I(1));
@@ -558,14 +609,32 @@ namespace ResourceNodes
 
             if (cache.Material(0) != 255)
             {
-                if (materials.ContainsKey(cache.Material(0)))
+                if (data.Materials.ContainsKey(cache.Material(0)))
                 {
-                    materials[cache.Material(0)] += cache.Content(0);
+                    data.Materials[cache.Material(0)] += cache.Content(0);
                 }
                 else
                 {
-                    materials.Add(cache.Material(0), cache.Content(0));
+                    data.Materials.Add(cache.Material(0), cache.Content(0));
                 }
+            }
+        }
+
+        public void UpdateFromState(DrillStateUpdate state)
+        {
+            if (MyAPIGateway.Session.IsServer)
+            {
+                return;
+            }
+
+            penaltyFactor = state.penalty;
+            invFull = state.invFull;
+            IsProducing = state.isProducing;
+            currentOre = state.oreName;
+            inGround = state.isInGround;
+            if (state.forceUpdate)
+            {
+                needsUpdate = true;
             }
         }
     }

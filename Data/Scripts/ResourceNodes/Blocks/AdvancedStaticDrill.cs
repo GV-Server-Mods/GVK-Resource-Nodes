@@ -40,9 +40,9 @@ namespace ResourceNodes
         public override void BlockInit()
         {
             DepositedResources += TickEmissive;
-            BaseOrePerSecond = level * 2;
-            InvMultiplier = 5;
-            BasePowerMW = 1.8f;
+            BaseOrePerSecond = 25; // Enough to feed 5 O2/H2 gens unmodded, 10 with speed mod
+            InvMultiplier = 5; // 5kL
+            BasePowerMW = 2.5f; // Takes 1 engine to power fully when speedmodded
         }
 
         public override bool LoadSubparts()
