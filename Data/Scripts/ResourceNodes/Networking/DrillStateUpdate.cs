@@ -15,7 +15,8 @@ namespace Math0424.Networking
         [ProtoMember(3)] public bool isProducing;
         [ProtoMember(4)] public bool invFull;
         [ProtoMember(5)] public string oreName;
-
+        [ProtoMember(6)] public float penalty;
+        [ProtoMember(7)] public bool forceUpdate;
 
         public int GetId()
         {
@@ -25,32 +26,32 @@ namespace Math0424.Networking
         public void Execute()
         {
             var e = MyEntities.GetEntityById(blockId);
-            if (e != null && e is MyCubeBlock)
+            var b = e as MyCubeBlock;
+            if (b == null)
             {
-                var b = e as MyCubeBlock;
-                if (!b.MarkedForClose)
-                {
-                    AdvancedStaticDrill d = b.GameLogic.GetAs<AdvancedStaticDrill>();
-                    MediumStaticDrill d1 = b.GameLogic.GetAs<MediumStaticDrill>();
-                    BasicStaticDrill d2 = b.GameLogic.GetAs<BasicStaticDrill>();
-                    if (d != null)
-                    {
-                        d.IsProducing = isProducing;
-                        d.state = this;
-                    } 
-                    else if (d1 != null)
-                    {
-                        d1.IsProducing = isProducing;
-                        d1.state = this;
-                    }
-                    else if (d2 != null)
-                    {
-                        d2.IsProducing = isProducing;
-                        d2.state = this;
-                    }
-                }
+                return;
+            }
+
+            if (b.MarkedForClose)
+            {
+                return;
+            }
+
+            var d = b.GameLogic.GetAs<AdvancedStaticDrill>();
+            var d1 = b.GameLogic.GetAs<MediumStaticDrill>();
+            var d2 = b.GameLogic.GetAs<BasicStaticDrill>();
+            if (d != null)
+            {
+                d.UpdateFromState(this);
+            }
+            else if (d1 != null)
+            {
+                d1.UpdateFromState(this);
+            }
+            else if (d2 != null)
+            {
+                d2.UpdateFromState(this);
             }
         }
-
     }
 }

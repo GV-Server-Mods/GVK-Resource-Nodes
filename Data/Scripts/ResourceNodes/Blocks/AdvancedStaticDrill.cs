@@ -8,26 +8,29 @@ using static Math0424.AnimationCoreAPI.AnimationCoreAPI;
 
 namespace ResourceNodes
 {
-
     [MyEntityComponentDescriptor(typeof(MyObjectBuilder_Drill), false, "AdvancedStaticDrill")]
-    class AdvancedStaticDrill : MyDrillBlock
+    internal sealed class AdvancedStaticDrill : MyDrillBlock
     {
-        MySubpart drillHead, powerLever;
+        private int animationFrames = -1;
+        private MySubpart drillHead, powerLever;
+        private int level = 3;
 
-        public override void SetEmissive(Color color)
+        protected override void SetEmissive(Color color)
         {
             if (MyAPIGateway.Session.IsServer)
             {
-                EmissiveStateChange packet = new EmissiveStateChange()
+                var packet = new EmissiveStateChange()
                 {
-                    blockId = Block.EntityId,
+                    blockId = Block.EntityId
                 };
                 packet.colors.Add("Emissive0", color.PackedValue);
                 packet.colors.Add("Emissive1", color.PackedValue);
                 packet.colors.Add("Emissive2", color.PackedValue);
                 packet.colors.Add("Emissive3", color.PackedValue);
-                ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet, 500, false);
+                ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet,
+                    500, false);
             }
+
             if (!MyAPIGateway.Utilities.IsDedicated)
             {
                 SetEmissives(color);
@@ -37,9 +40,9 @@ namespace ResourceNodes
         public override void BlockInit()
         {
             DepositedResources += TickEmissive;
-            baseSpeed = 10; // 375 Si per min //5
-            invMultiplier = 6;
-            ((IMyShipDrill)Block).PowerConsumptionMultiplier = 20f;
+            BaseOrePerSecond = 25; // Enough to feed 5 O2/H2 gens unmodded, 10 with speed mod
+            InvMultiplier = 5; // 5kL
+            BasePowerMW = 2.5f; // Takes 1 engine to power fully when speedmodded
         }
 
         public override bool LoadSubparts()
@@ -70,20 +73,19 @@ namespace ResourceNodes
             powerLever.Pos.SetOriginMatrix(MatrixD.CreateTranslation(new Vector3(1.47f, -3.42, 3.07f)));
             powerLever.Pos.ResetPosRot();
 
-            powerLever.AddComponent<PowerLeverComp>().Create(this, new Vector3(.54, 0, .83), 50, -180, Color.Green, Color.Red, "lever");
-
+            powerLever.AddComponent<PowerLeverComp>().Create(this, new Vector3(.54, 0, .83), 50, -180, Color.Green,
+                Color.Red, "lever");
         }
 
-        int AnimationFrames = -1;
         public override void AnimationUpdate()
         {
             if (IsProducing)
             {
-                AnimationFrames++;
-                if (AnimationFrames % 200 == 0)
+                animationFrames++;
+                if (animationFrames % 200 == 0)
                 {
                     drillHead.Pos.Rotate(40, Vector3.Up, 180, LerpType.Bounce, EaseType.Out);
-                    drillHead.Pos.Translate(40, Vector3.Down * 1.8f, LerpType.Elastic, EaseType.Out); 
+                    drillHead.Pos.Translate(40, Vector3.Down * 1.8f, LerpType.Elastic, EaseType.Out);
                     drillHead.Effects.PlaySound("AdvancedDrillSlam");
 
                     drillHead.Pos.Rotate(40, Vector3.Up, 180, LerpType.Expo, EaseType.InOut, 100);
@@ -93,16 +95,15 @@ namespace ResourceNodes
 
                     drillHead.Pos.Translate(40, Vector3.Up * .1f, LerpType.Back, EaseType.Out, 141);
                 }
-            } 
+            }
             else
             {
-                AnimationFrames = -1;
+                animationFrames = -1;
                 drillHead.ClearActions();
                 drillHead.Pos.ResetPos();
             }
         }
 
-        int level = 3;
         private void TickEmissive()
         {
             level = (level + 1) % 5;
@@ -110,16 +111,17 @@ namespace ResourceNodes
             if (level == 4)
             {
                 SetEmissive(Color.Gray);
-            } 
+            }
             else
             {
-                EmissiveStateChange packet = new EmissiveStateChange()
+                var packet = new EmissiveStateChange()
                 {
-                    blockId = Block.EntityId,
+                    blockId = Block.EntityId
                 };
                 packet.colors.Add("Emissive" + level, Color.Green.PackedValue);
-                ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet, 500, false);
-                
+                ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet,
+                    500, false);
+
                 if (!MyAPIGateway.Utilities.IsDedicated)
                 {
                     Block.SetEmissiveParts("Emissive" + level, Color.Green, 1);
@@ -127,12 +129,12 @@ namespace ResourceNodes
             }
         }
 
-        private void SetEmissives(Color color, float level = 0)
+        private void SetEmissives(Color color, float newLevel = 0)
         {
-            Block.SetEmissiveParts("Emissive0", color, level);
-            Block.SetEmissiveParts("Emissive1", color, level);
-            Block.SetEmissiveParts("Emissive2", color, level);
-            Block.SetEmissiveParts("Emissive3", color, level);
+            Block.SetEmissiveParts("Emissive0", color, newLevel);
+            Block.SetEmissiveParts("Emissive1", color, newLevel);
+            Block.SetEmissiveParts("Emissive2", color, newLevel);
+            Block.SetEmissiveParts("Emissive3", color, newLevel);
         }
     }
 }
