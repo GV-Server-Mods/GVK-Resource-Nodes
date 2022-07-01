@@ -15,6 +15,7 @@ using Sandbox.Game.EntityComponents;
 using VRage;
 using VRage.Collections;
 using VRage.Game;
+using VRage.Game.Components;
 using VRage.Game.Entities;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
@@ -130,6 +131,7 @@ namespace ResourceNodes
         private void MarkForUpdate()
         {
             needsUpdate = true;
+            functionalBlock.RefreshCustomInfo();
         }
 
         private void UpdateMultipliers()
@@ -152,14 +154,18 @@ namespace ResourceNodes
                 GetAllDrillsInSphere(minerData.Nearby, minerData.Drills);
             }, d =>
             {
+                if (!IsValid(this) || !IsValid(Entity))
+                {
+                    return;
+                }
+
                 var minerData = (MinerWorkData)d;
                 penaltyFactor = 0;
                 foreach (var other in minerData.Drills)
                 {
-                    if (other == null || other.MarkedForClose || other.Closed ||
+                    if (!IsValid(other) || !IsValid(other.Entity) ||
                         other.Entity.EntityId == Entity.EntityId ||
-                        other.currentOre != currentOre ||
-                        !other.IsProducing)
+                        other.currentOre != currentOre || !other.IsProducing)
                     {
                         continue;
                     }
@@ -196,6 +202,7 @@ namespace ResourceNodes
                 sink.SetMaxRequiredInputByType(Electricity, newPower);
                 sink.SetRequiredInputFuncByType(Electricity, () => Block.IsWorking ? BasePowerMW * modifier : 0.002f);
                 sink.Update();
+                functionalBlock.RefreshCustomInfo();
             }, data);
         }
 
@@ -276,6 +283,7 @@ namespace ResourceNodes
             if (updateThisTick && !string.IsNullOrEmpty(currentOre))
             {
                 UpdateMultipliers();
+                functionalBlock.RefreshCustomInfo();
                 if (!MyAPIGateway.Session.IsServer)
                 {
                     return;
@@ -537,6 +545,13 @@ namespace ResourceNodes
             builder.AppendLine(inGround.ToString());
             builder.Append("Inventory full: ");
             builder.Append(invFull.ToString());
+            UpdateTerminal();
+        }
+
+        private void UpdateTerminal()
+        {
+            functionalBlock.ShowOnHUD = !functionalBlock.ShowOnHUD;
+            functionalBlock.ShowOnHUD = !functionalBlock.ShowOnHUD;
         }
 
         private void RemoveFromMiners(MyEntity e)
@@ -582,12 +597,17 @@ namespace ResourceNodes
                 GetAllDrillsInSphere(minerData.Nearby, minerData.Drills);
             }, d =>
             {
+                if (!IsValid(this) || !IsValid(Entity))
+                {
+                    return;
+                }
+
                 var minerData = (MinerWorkData)d;
 
                 foreach (var other in minerData.Drills)
                 {
-                    if (other == null || other.MarkedForClose || other.Closed ||
-                        other.Entity.EntityId == entityId ||
+                    if (!IsValid(other) || !IsValid(other.Entity) ||
+                        other.Entity.EntityId == Entity.EntityId ||
                         other.currentOre != currentOre)
                     {
                         continue;
@@ -618,6 +638,16 @@ namespace ResourceNodes
                     data.Materials.Add(cache.Material(0), cache.Content(0));
                 }
             }
+        }
+
+        private static bool IsValid(IMyEntity entity)
+        {
+            return entity == null || entity.MarkedForClose || entity.Closed;
+        }
+
+        private static bool IsValid(MyGameLogicComponent entity)
+        {
+            return entity == null || entity.MarkedForClose || entity.Closed;
         }
 
         public void UpdateFromState(DrillStateUpdate state)
