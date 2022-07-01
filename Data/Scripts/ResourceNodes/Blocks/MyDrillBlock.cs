@@ -642,12 +642,12 @@ namespace ResourceNodes
 
         private static bool IsValid(IMyEntity entity)
         {
-            return entity == null || entity.MarkedForClose || entity.Closed;
+            return !(entity == null || entity.MarkedForClose || entity.Closed);
         }
 
         private static bool IsValid(MyGameLogicComponent entity)
         {
-            return entity == null || entity.MarkedForClose || entity.Closed;
+            return !(entity == null || entity.MarkedForClose || entity.Closed);
         }
 
         public void UpdateFromState(DrillStateUpdate state)
