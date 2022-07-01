@@ -59,7 +59,8 @@ namespace ResourceNodes
         private const float EncroachmentDistance = 50f; // Distance to other miner mining same ore
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
-
+        private const float IdlePower = 0.02f;
+        
         private static readonly Guid StorageGuid = new Guid("80B6388C-EE37-4C8D-B0E3-2272E3892901");
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
 
@@ -198,9 +199,9 @@ namespace ResourceNodes
                     return;
                 }
 
-                sink.SetRequiredInputByType(Electricity, 0.002f);
+                sink.SetRequiredInputByType(Electricity, IdlePower);
                 sink.SetMaxRequiredInputByType(Electricity, newPower);
-                sink.SetRequiredInputFuncByType(Electricity, () => Block.IsWorking ? BasePowerMW * modifier : 0.002f);
+                sink.SetRequiredInputFuncByType(Electricity, () => IsProducing ? BasePowerMW * modifier : IdlePower);
                 sink.Update();
                 functionalBlock.RefreshCustomInfo();
             }, data);
