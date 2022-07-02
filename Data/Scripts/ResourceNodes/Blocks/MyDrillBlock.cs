@@ -92,6 +92,8 @@ namespace ResourceNodes
         private int lastUpdateTick;
 
         private IMyInventory Inv => functionalBlock.GetInventory(0);
+        private bool CanProduce => functionalBlock.Enabled && !Inv.IsFull &&
+                                   inGround && !string.IsNullOrEmpty(currentOre);
 
         protected abstract void SetEmissive(Color color);
 
@@ -113,14 +115,14 @@ namespace ResourceNodes
             Block.OnUpgradeValuesChanged += MarkForUpdate;
             functionalBlock.IsWorkingChanged += OnWorkingChanged;
 
-            tickResource = Math.Abs(GetHashCode() % TickRate);
-            tickGroundUpdate = Math.Abs(GetHashCode() % ResourceUpdateRate);
+            tickResource = Math.Abs(GetHashCode()) % TickRate;
+            tickGroundUpdate = Math.Abs(GetHashCode()) % ResourceUpdateRate;
             BlockInit();
         }
 
         private bool IsProjection()
         {
-            return Block != null && Block.CubeGrid.Physics == null;
+            return Block?.CubeGrid?.Physics == null;
         }
 
         private void OnWorkingChanged(IMyCubeBlock obj)
@@ -199,9 +201,8 @@ namespace ResourceNodes
                     return;
                 }
 
-                sink.SetRequiredInputByType(Electricity, IdlePower);
                 sink.SetMaxRequiredInputByType(Electricity, newPower);
-                sink.SetRequiredInputFuncByType(Electricity, () => IsProducing ? BasePowerMW * modifier : IdlePower);
+                sink.SetRequiredInputFuncByType(Electricity, () => CanProduce ? BasePowerMW * modifier : IdlePower);
                 sink.Update();
                 functionalBlock.RefreshCustomInfo();
             }, data);
@@ -318,7 +319,7 @@ namespace ResourceNodes
                         {
                             SetEmissive(Color.Red);
                         }
-                        else if (!IsProducing || currentOre == null || Inv.IsFull || invFull)
+                        else if (!IsProducing || string.IsNullOrEmpty(currentOre) || Inv.IsFull || invFull)
                         {
                             SetEmissive(Color.Yellow);
                         }
@@ -384,15 +385,16 @@ namespace ResourceNodes
             }
 
             var wasProducing = IsProducing;
-            IsProducing = functionalBlock.Enabled && functionalBlock.IsWorking && !Inv.IsFull && inGround;
 
-            if (IsProducing)
+            if (CanProduce)
             {
-                IsProducing = Block.ResourceSink.IsPoweredByType(Electricity) &&
-                              Block.ResourceSink.IsPowerAvailable(Electricity,
-                                  Block.ResourceSink.MaxRequiredInputByType(Electricity));
+                Block.ResourceSink.Update();
+                IsProducing = CanProduce && functionalBlock.IsWorking;
             }
-
+            else
+            {
+                IsProducing = false;
+            }
             if (wasProducing == IsProducing)
             {
                 return;
