@@ -43,6 +43,7 @@ namespace ResourceNodes
             BaseOrePerSecond = 6.25f; // One quarter of an advanced
             InvMultiplier = 2; // 2kL
             BasePowerMW = 0.5f; // 1/4th of an advanced
+            AnimationLength = 300;
         }
 
         public override bool LoadSubparts()

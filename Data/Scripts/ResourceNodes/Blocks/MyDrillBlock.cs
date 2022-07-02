@@ -60,7 +60,7 @@ namespace ResourceNodes
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
         private const float IdlePower = 0.02f;
-        
+
         private static readonly Guid StorageGuid = new Guid("80B6388C-EE37-4C8D-B0E3-2272E3892901");
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
 
@@ -90,20 +90,26 @@ namespace ResourceNodes
         private Task? groundScanTask = null;
 
         private int lastUpdateTick;
+        protected int AnimationLength = 1;
+        private int nextAnimationEndTick = 0;
 
         private IMyInventory Inv => functionalBlock.GetInventory(0);
-        private bool CanProduce => functionalBlock.Enabled && !Inv.IsFull &&
-                                   inGround && !string.IsNullOrEmpty(currentOre);
+
+        private bool CanProduce => functionalBlock.Enabled &&
+                                   oreObject != null &&
+                                   Inv.CanItemsBeAdded((MyFixedPoint)ProducedAmount, oreObject) &&
+                                   inGround &&
+                                   !string.IsNullOrEmpty(currentOre);
+
+        private double ProducedAmount => BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier;
 
         protected abstract void SetEmissive(Color color);
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
             LoadOntoBlock();
-            var cubeSize = Block.BlockDefinition.CubeSize == MyCubeSize.Large
-                ? 2.5f
-                : 0.5f;
-            allowedDistanceToGround = Block.BlockDefinition.Size.Y * cubeSize / 2f + 0.25f;
+            var cubeSize = Block.BlockDefinition.CubeSize == MyCubeSize.Large ? 2.5f : 0.5f;
+            allowedDistanceToGround = Block.BlockDefinition.Size.Y * cubeSize / 2f;
             Block.UpgradeValues.Add("Productivity", 0f);
             Block.UpgradeValues.Add("Effectiveness", 1f);
             Block.UpgradeValues.Add("PowerEfficiency", 1f);
@@ -274,7 +280,12 @@ namespace ResourceNodes
 
             if (tick % ResourceUpdateRate == tickGroundUpdate)
             {
-                if (!MyAPIGateway.Session.IsServer || (groundScanTask != null && string.IsNullOrEmpty(currentOre)))
+                if (!MyAPIGateway.Session.IsServer)
+                {
+                    return;
+                }
+
+                if (groundScanTask != null)
                 {
                     return;
                 }
@@ -347,9 +358,12 @@ namespace ResourceNodes
                 return;
             }
 
-            UpdateIsProducing();
+            if (tick >= nextAnimationEndTick)
+            {
+                UpdateIsProducing();
+            }
 
-            if (!IsProducing)
+            if (!IsProducing || !functionalBlock.IsWorking || !CanProduce)
             {
                 return;
             }
@@ -386,15 +400,18 @@ namespace ResourceNodes
 
             var wasProducing = IsProducing;
 
+            nextAnimationEndTick = tick + AnimationLength;
+
             if (CanProduce)
             {
                 Block.ResourceSink.Update();
-                IsProducing = CanProduce && functionalBlock.IsWorking;
+                IsProducing = functionalBlock.IsWorking;
             }
             else
             {
                 IsProducing = false;
             }
+
             if (wasProducing == IsProducing)
             {
                 return;
@@ -426,7 +443,9 @@ namespace ResourceNodes
                 var detected = new List<MyVoxelBase>();
                 var position = Block.PositionComp.GetPosition() +
                                Block.PositionComp.WorldMatrixRef.Down * allowedDistanceToGround;
-                var boundingSphereD = new BoundingSphereD(position, 2);
+
+                var cubeSize = Block.BlockDefinition.CubeSize == MyCubeSize.Large ? 2.5f : 0.5f;
+                var boundingSphereD = new BoundingSphereD(position, 2 * cubeSize);
                 MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
                 foreach (var map in detected)
                 {

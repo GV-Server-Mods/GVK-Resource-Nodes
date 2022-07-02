@@ -43,6 +43,7 @@ namespace ResourceNodes
             BaseOrePerSecond = 25; // Enough to feed 5 O2/H2 gens unmodded, 10 with speed mod
             InvMultiplier = 5; // 5kL
             BasePowerMW = 2.5f; // Takes 1 engine to power fully when speedmodded
+            AnimationLength = 200;
         }
 
         public override bool LoadSubparts()
