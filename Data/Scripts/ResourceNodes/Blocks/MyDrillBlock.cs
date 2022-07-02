@@ -79,6 +79,7 @@ namespace ResourceNodes
         private float currentOreRatio;
         private MyObjectBuilder_Ore oreObject;
         private float allowedDistanceToGround;
+        private bool serverIsProducing;
 
         public bool IsProducing;
         protected Action DepositedResources;
@@ -96,9 +97,9 @@ namespace ResourceNodes
         private IMyInventory Inv => functionalBlock.GetInventory(0);
 
         private bool CanProduce => functionalBlock.Enabled &&
-                                   oreObject != null &&
-                                   Inv.CanItemsBeAdded((MyFixedPoint)ProducedAmount, oreObject) &&
-                                   inGround &&
+                                   ((oreObject != null &&
+                                     Inv.CanItemsBeAdded((MyFixedPoint)ProducedAmount, oreObject) &&
+                                     inGround) || serverIsProducing) &&
                                    !string.IsNullOrEmpty(currentOre);
 
         private double ProducedAmount => BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier;
@@ -271,6 +272,7 @@ namespace ResourceNodes
             tick = MyAPIGateway.Session.GameplayFrameCounter;
             var updateThisTick = needsUpdate;
             needsUpdate = false;
+            var isServer = MyAPIGateway.Session.IsServer;
 
             if (!functionalBlock.CubeGrid.IsStatic)
             {
@@ -278,13 +280,8 @@ namespace ResourceNodes
                 return;
             }
 
-            if (tick % ResourceUpdateRate == tickGroundUpdate)
+            if (isServer && tick % ResourceUpdateRate == tickGroundUpdate)
             {
-                if (!MyAPIGateway.Session.IsServer)
-                {
-                    return;
-                }
-
                 if (groundScanTask != null)
                 {
                     return;
@@ -296,14 +293,9 @@ namespace ResourceNodes
             if (updateThisTick && !string.IsNullOrEmpty(currentOre))
             {
                 UpdateMultipliers();
-                functionalBlock.RefreshCustomInfo();
-                if (!MyAPIGateway.Session.IsServer)
-                {
-                    return;
-                }
             }
 
-            if (tick % 10 == 0 || updateThisTick)
+            if (isServer && (tick % 10 == 0 || updateThisTick))
             {
                 var packet = new DrillStateUpdate
                 {
@@ -317,6 +309,21 @@ namespace ResourceNodes
                 };
                 ResourceNode.Instance.Network.TransmitToPlayersWithinRange(Block.PositionComp.GetPosition(), packet,
                     1500, false);
+            }
+
+            if (!updateThisTick && tick % TickRate != tickResource)
+            {
+                return;
+            }
+
+            if (tick >= nextAnimationEndTick)
+            {
+                UpdateIsProducing();
+
+                if (!isServer)
+                {
+                    return;
+                }
 
                 if (Block.IsBuilt)
                 {
@@ -351,16 +358,6 @@ namespace ResourceNodes
                         SetEmissive(Color.Yellow);
                     }
                 }
-            }
-
-            if (!updateThisTick && tick % TickRate != tickResource)
-            {
-                return;
-            }
-
-            if (tick >= nextAnimationEndTick)
-            {
-                UpdateIsProducing();
             }
 
             if (!IsProducing || !functionalBlock.IsWorking || !CanProduce)
@@ -400,7 +397,7 @@ namespace ResourceNodes
 
             var wasProducing = IsProducing;
 
-            nextAnimationEndTick = tick + AnimationLength;
+            nextAnimationEndTick = tick + AnimationLength - 1;
 
             if (CanProduce)
             {
@@ -681,7 +678,7 @@ namespace ResourceNodes
 
             penaltyFactor = state.penalty;
             invFull = state.invFull;
-            IsProducing = state.isProducing;
+            serverIsProducing = state.isProducing;
             currentOre = state.oreName;
             inGround = state.isInGround;
             if (state.forceUpdate)
