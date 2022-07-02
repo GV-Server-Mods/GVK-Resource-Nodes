@@ -156,6 +156,11 @@ namespace ResourceNodes
                 return;
             }
 
+            if (!IsValid(Entity))
+            {
+                return;
+            }
+
             var data = new MinerWorkData(new BoundingSphereD(Block.PositionComp.GetPosition(), EncroachmentDistance));
 
             MyAPIGateway.Parallel.Start(d =>
@@ -389,6 +394,11 @@ namespace ResourceNodes
 
         private void UpdateIsProducing()
         {
+            if (!IsValid(Entity))
+            {
+                return;
+            }
+
             if (IsProjection())
             {
                 IsProducing = false;
@@ -427,6 +437,11 @@ namespace ResourceNodes
 
         private Task? UpdateInGround()
         {
+            if (!IsValid(Entity))
+            {
+                return null;
+            }
+
             if (IsProjection())
             {
                 return null;
@@ -455,6 +470,11 @@ namespace ResourceNodes
                 }
             }, d =>
             {
+                if (!IsValid(Entity))
+                {
+                    return;
+                }
+
                 var materialData = (MaterialScanWorkData)d;
                 inGround = materialData.Materials.Count >= 1;
                 currentOre = materialData.Ore;
@@ -535,6 +555,11 @@ namespace ResourceNodes
 
         private void CustomInfo(IMyTerminalBlock block, StringBuilder builder)
         {
+            if (!IsValid(block) || builder == null)
+            {
+                return;
+            }
+
             builder.Clear();
             builder.AppendLine();
 
@@ -661,12 +686,12 @@ namespace ResourceNodes
 
         private static bool IsValid(IMyEntity entity)
         {
-            return !(entity == null || entity.MarkedForClose || entity.Closed);
+            return entity != null && !entity.MarkedForClose && !entity.Closed;
         }
 
         private static bool IsValid(MyGameLogicComponent entity)
         {
-            return !(entity == null || entity.MarkedForClose || entity.Closed);
+            return entity != null && !entity.MarkedForClose && !entity.Closed;
         }
 
         public void UpdateFromState(DrillStateUpdate state)
