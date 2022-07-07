@@ -60,7 +60,8 @@ namespace ResourceNodes
         private const float EncroachmentPenalty = 0.50f; // 50% multiplicative reduction in effectiveness
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
         private const float IdlePower = 0.02f;
-
+        private const int OreDetectionRadius = 10;
+        
         private static readonly Guid StorageGuid = new Guid("80B6388C-EE37-4C8D-B0E3-2272E3892901");
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
 
@@ -488,12 +489,15 @@ namespace ResourceNodes
 
         private void AssignNewMaterial(MaterialScanWorkData data)
         {
+            var detected = new List<MyVoxelBase>();
             //get all the materials
+            var blockPosition = Block.PositionComp.GetPosition();
+            var stepDown = Block.PositionComp.WorldMatrixRef.Down * (OreDetectionRadius/2f);
             for (var i = 0; i < 60; i++)
             {
-                var detected = new List<MyVoxelBase>();
-                var position = Block.PositionComp.GetPosition() + Block.PositionComp.WorldMatrixRef.Down * i * 3;
-                var boundingSphereD = new BoundingSphereD(position, 10);
+                detected.Clear();
+                var position = blockPosition + stepDown * i;
+                var boundingSphereD = new BoundingSphereD(position, OreDetectionRadius);
                 MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
                 foreach (var map in detected)
                 {
