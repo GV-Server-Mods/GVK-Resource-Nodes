@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using ParallelTasks;
+using Sandbox.Engine.Voxels;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.EntityComponents;
 using VRage;
@@ -22,6 +23,7 @@ using VRage.Game.ModAPI;
 using VRage.Game.ObjectBuilders.ComponentSystem;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
+using VRage.Utils;
 using VRage.Voxels;
 using VRageMath;
 using IMyInventory = VRage.Game.ModAPI.IMyInventory;
@@ -61,8 +63,9 @@ namespace ResourceNodes
         private const int ResourceUpdateRate = 60 * 30; // 60 ticks per second * however many seconds to check
         private const float IdlePower = 0.02f;
         private const int OreDetectionRadius = 10;
-        
-        private static readonly Guid StorageGuid = new Guid("80B6388C-EE37-4C8D-B0E3-2272E3892901");
+        private const int MaxOreDetectionDepth = 200;
+        private const float RadiusOverlapFactor = 4f;
+
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
 
         private int tick;
@@ -492,12 +495,19 @@ namespace ResourceNodes
             var detected = new List<MyVoxelBase>();
             //get all the materials
             var blockPosition = Block.PositionComp.GetPosition();
-            var stepDown = Block.PositionComp.WorldMatrixRef.Down * (OreDetectionRadius/2f);
-            for (var i = 0; i < 60; i++)
+            var stepDown = Block.PositionComp.WorldMatrixRef.Down * (OreDetectionRadius / RadiusOverlapFactor);
+            var steps = MaxOreDetectionDepth / (OreDetectionRadius / RadiusOverlapFactor);
+            if (MaxOreDetectionDepth % (OreDetectionRadius / RadiusOverlapFactor) != 0)
             {
+                steps++; // Reachable if the depth is not evenly divisible by the radius
+            }
+
+            for (var i = 0; i < steps; i++)
+            {
+                var radiusModifier = i / (steps - 1) * (EncroachmentDistance / 2);
                 detected.Clear();
                 var position = blockPosition + stepDown * i;
-                var boundingSphereD = new BoundingSphereD(position, OreDetectionRadius);
+                var boundingSphereD = new BoundingSphereD(position, OreDetectionRadius + radiusModifier);
                 MyGamePruningStructure.GetAllVoxelMapsInSphere(ref boundingSphereD, detected);
                 foreach (var map in detected)
                 {
