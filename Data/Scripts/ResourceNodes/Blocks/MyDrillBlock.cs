@@ -283,7 +283,7 @@ namespace ResourceNodes
             needsUpdate = false;
             var isServer = MyAPIGateway.Session.IsServer;
 
-            if (!functionalBlock.CubeGrid.IsStatic)
+            if (isServer && !functionalBlock.CubeGrid.IsStatic)
             {
                 functionalBlock.Enabled = false;
                 return;
