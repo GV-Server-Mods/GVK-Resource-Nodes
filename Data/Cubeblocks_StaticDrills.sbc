@@ -80,7 +80,7 @@
 			</Id>
 			<DisplayName>Static Drill</DisplayName>
 			<Icon>Textures\StaticDrill.dds</Icon>
-			<Description>Place this drill atop a ore deposit and power it to start mining ore</Description>
+			<Description>Place this drill atop a ore deposit and power it to start mining ore. Does not work in Zone 0.</Description>
 			<CubeSize>Large</CubeSize>
 			<BlockTopology>TriangleMesh</BlockTopology>
 			<Size x="2" y="3" z="2"/>
@@ -152,7 +152,7 @@
 			</Id>
 			<DisplayName>Advanced Static Drill</DisplayName>
 			<Icon>Textures\AdvancedStaticDrill.dds</Icon>
-			<Description>Place this drill atop a ore deposit and power it to start mining ore</Description>
+			<Description>Place this drill atop a ore deposit and power it to start mining ore. Does not work in Zone 0.</Description>
 			<CubeSize>Large</CubeSize>
 			<BlockTopology>TriangleMesh</BlockTopology>
 			<Size x="3" y="4" z="3"/>
