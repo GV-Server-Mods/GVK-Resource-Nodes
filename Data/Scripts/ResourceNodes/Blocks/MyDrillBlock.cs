@@ -195,8 +195,8 @@ namespace ResourceNodes
                 var drill = Block as IMyShipDrill;
 
                 var productivity = Block.UpgradeValues["Productivity"];
-                var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1f) * drill.DrillHarvestMultiplier * 3f + 1f;
 				var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f) * drill.DrillHarvestMultiplier;
+                var powerEfficiency = (Block.UpgradeValues["PowerEfficiency"] - 1f) * drill.PowerConsumptionMultiplier * 3f + 1f;
 
                 yieldMultiplier = (productivity + effectiveness) * (1 - penaltyFactor);
                 if (drill == null)
