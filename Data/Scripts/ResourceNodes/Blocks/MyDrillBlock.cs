@@ -192,12 +192,13 @@ namespace ResourceNodes
                     penaltyFactor += (1 - penaltyFactor) * EncroachmentPenalty;
                 }
 
+                var drill = Block as IMyShipDrill;
+
                 var productivity = Block.UpgradeValues["Productivity"];
-                var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f;
-                var powerEfficiency = (Block.UpgradeValues["PowerEfficiency"] - 1f) * 3f + 1f;
+                var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1f) * drill.DrillHarvestMultiplier * 3f + 1f;
+				var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f) * drill.DrillHarvestMultiplier;
 
                 yieldMultiplier = (productivity + effectiveness) * (1 - penaltyFactor);
-                var drill = Block as IMyShipDrill;
                 if (drill == null)
                 {
                     return;
@@ -577,8 +578,10 @@ namespace ResourceNodes
             builder.Clear();
             builder.AppendLine();
 
+            var drill = Block as IMyShipDrill;
+
             var productivity = Block.UpgradeValues["Productivity"];
-            var effectiveness = (Block.UpgradeValues["Effectiveness"] - 1) * 3f + 1;
+			var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f) * drill.DrillHarvestMultiplier;
 
             if (IsProducing)
             {
