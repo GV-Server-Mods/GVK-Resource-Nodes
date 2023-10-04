@@ -100,7 +100,8 @@ namespace ResourceNodes
 
         private IMyInventory Inv => functionalBlock.GetInventory(0);
 
-        private bool CanProduce => functionalBlock.Enabled &&
+        private bool CanProduce => IsValid(functionalBlock) &&
+                                   functionalBlock.Enabled &&
                                    ((oreObject != null &&
                                      Inv.CanItemsBeAdded((MyFixedPoint)ProducedAmount, oreObject) &&
                                      inGround) || serverIsProducing) &&
