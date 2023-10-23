@@ -107,7 +107,7 @@ namespace ResourceNodes
                                      inGround) || serverIsProducing) &&
                                    !string.IsNullOrEmpty(currentOre);
 
-        private double ProducedAmount => BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier;
+        private double ProducedAmount => BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier * ((IMyShipDrill)Block).DrillHarvestMultiplier;
 
         protected abstract void SetEmissive(Color color);
 
@@ -196,7 +196,7 @@ namespace ResourceNodes
                 var drill = Block as IMyShipDrill;
 
                 var productivity = Block.UpgradeValues["Productivity"];
-				var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f) * drill.DrillHarvestMultiplier;
+                var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f);
                 var powerEfficiency = (Block.UpgradeValues["PowerEfficiency"] - 1f) * drill.PowerConsumptionMultiplier * 3f + 1f;
 
                 yieldMultiplier = (productivity + effectiveness) * (1 - penaltyFactor);
@@ -382,8 +382,7 @@ namespace ResourceNodes
             }
 
             var periodMul = ((float)tick - lastUpdateTick) / TickRate;
-            var amount = BaseOrePerSecond * currentOreRatio * RateInSeconds * yieldMultiplier;
-            amount *= periodMul;
+            var amount = ProducedAmount * periodMul;
             lastUpdateTick = tick;
 
             invFull = !Inv.CanItemsBeAdded((MyFixedPoint)amount, oreObject);
@@ -582,7 +581,7 @@ namespace ResourceNodes
             var drill = Block as IMyShipDrill;
 
             var productivity = Block.UpgradeValues["Productivity"];
-			var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f) * drill.DrillHarvestMultiplier;
+            var effectiveness = ((Block.UpgradeValues["Effectiveness"] - 1f) * 3f + 1f);
 
             if (IsProducing)
             {
