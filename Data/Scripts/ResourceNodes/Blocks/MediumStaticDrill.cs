@@ -86,21 +86,21 @@ namespace ResourceNodes
                 animationFrames++;
                 if (animationFrames % 100 == 0)
                 {
-                    slammer.Pos.Rotate(20, Vector3.Up, 180, LerpType.Bounce, EaseType.Out);
+                    //slammer.Pos.Rotate(20, Vector3.Up, 180, LerpType.Bounce, EaseType.Out);
                     slammer.Pos.Translate(20, Vector3.Down, LerpType.Elastic, EaseType.Out);
 
                     slammer.AddAction(new CustomAction(slammer, () => { slammer.Effects.PlaySound("MediumDrillSlam"); },
                         15));
 
-                    slammer.Pos.Rotate(20, Vector3.Up, 180, LerpType.Expo, EaseType.InOut, 50);
-                    slammer.Pos.Translate(20, Vector3.Up, LerpType.Expo, EaseType.InOut, 50);
+                    slammer.Pos.Rotate(40, Vector3.Up, 180, LerpType.Expo, EaseType.InOut, 40);
+                    slammer.Pos.Translate(40, Vector3.Up, LerpType.Expo, EaseType.InOut, 40);
 
                     pipes.Pos.Rotate(30, Vector3.Up, -29, LerpType.Cubic, EaseType.In, 60);
                     pipes.Pos.ResetPosRot(90);
 
                     slammer.Pos.ResetPos(70);
 
-                    slammer.Pos.Translate(20, Vector3.Up * .1f, LerpType.Back, EaseType.Out, 71);
+                    //slammer.Pos.Translate(20, Vector3.Up * .1f, LerpType.Back, EaseType.Out, 71);
                 }
             }
             else

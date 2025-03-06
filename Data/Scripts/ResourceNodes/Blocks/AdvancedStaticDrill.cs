@@ -85,16 +85,16 @@ namespace ResourceNodes
                 animationFrames++;
                 if (animationFrames % 200 == 0)
                 {
-                    drillHead.Pos.Rotate(40, Vector3.Up, 180, LerpType.Bounce, EaseType.Out);
-                    drillHead.Pos.Translate(40, Vector3.Down * 1.8f, LerpType.Elastic, EaseType.Out);
+                    //drillHead.Pos.Rotate(40, Vector3.Up, 180, LerpType.Bounce, EaseType.Out);
+                    drillHead.Pos.Translate(40, Vector3.Down * 2f, LerpType.Elastic, EaseType.Out);
                     drillHead.Effects.PlaySound("AdvancedDrillSlam");
 
-                    drillHead.Pos.Rotate(40, Vector3.Up, 180, LerpType.Expo, EaseType.InOut, 100);
-                    drillHead.Pos.Translate(40, Vector3.Up * 1.8f, LerpType.Expo, EaseType.InOut, 100);
+                    drillHead.Pos.Rotate(160, Vector3.Down, 30f, LerpType.Expo, EaseType.InOut, 40);
+                    drillHead.Pos.Translate(160, Vector3.Up * 2f, LerpType.Expo, EaseType.InOut, 40);
 
-                    drillHead.Pos.ResetPos(140);
+                    drillHead.Pos.ResetPos(200);
 
-                    drillHead.Pos.Translate(40, Vector3.Up * .1f, LerpType.Back, EaseType.Out, 141);
+                    //drillHead.Pos.Translate(40, Vector3.Up * .1f, LerpType.Back, EaseType.Out, 141);
                 }
             }
             else
