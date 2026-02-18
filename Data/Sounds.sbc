@@ -9,11 +9,11 @@
 			<Category>AMB</Category>
 			<MaxDistance>100</MaxDistance>
 			<PitchVariation>20</PitchVariation>
-			<SoundLimit>5</SoundLimit>
+			<SoundLimit>3</SoundLimit>
 			<DistantSounds>
 				<DistantSound DistanceCrossfade="10" Distance="100" Sound="MediumDrillSlam_Distant"/>
 			</DistantSounds>
-			<Volume>0.5</Volume>
+			<Volume>0.25</Volume>
 			<Loopable>false</Loopable>
 			<Waves>
 				<Wave Type="D3">
@@ -29,7 +29,7 @@
 			<Category>SHOT</Category>
 			<MaxDistance>1000</MaxDistance>
 			<PitchVariation>10</PitchVariation>
-			<Volume>0.75</Volume>
+			<Volume>0.5</Volume>
 			<Loopable>false</Loopable>
 			<Waves>
 				<Wave Type="D3">
@@ -45,11 +45,11 @@
 			<Category>AMB</Category>
 			<MaxDistance>200</MaxDistance>
 			<PitchVariation>20</PitchVariation>
-			<SoundLimit>5</SoundLimit>
+			<SoundLimit>3</SoundLimit>
 			<DistantSounds>
 				<DistantSound DistanceCrossfade="10" Distance="200" Sound="AdvancedDrillSlam_Distant"/>
 			</DistantSounds>
-			<Volume>0.5</Volume>
+			<Volume>0.25</Volume>
 			<Loopable>false</Loopable>
 			<Waves>
 				<Wave Type="D3">
@@ -65,7 +65,7 @@
 			<Category>SHOT</Category>
 			<MaxDistance>1500</MaxDistance>
 			<PitchVariation>10</PitchVariation>
-			<Volume>0.75</Volume>
+			<Volume>0.5</Volume>
 			<Loopable>false</Loopable>
 			<Waves>
 				<Wave Type="D3">
