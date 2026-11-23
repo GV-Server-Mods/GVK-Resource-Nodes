@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<!-- Home tab: the Static Drills group on Keen's production row (Y 18). Keyed by the group primary's BlockPairName (its DisplayName, as the blocks set none). Layout: GVK_Settings Docs/design/g-menu.md -->
+	<BlockPositions>
+		<BlockPosition>
+			<Name>Static Drill</Name>
+			<Position>
+				<X>5</X>
+				<Y>18</Y>
+			</Position>
+		</BlockPosition>
+	</BlockPositions>
+</Definitions>

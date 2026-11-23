@@ -8,11 +8,9 @@
 			</Id>
 			<DisplayName>GV Kharak Items</DisplayName>
 			<Name>GVK</Name>
-			<StrictSearch>false</StrictSearch>
+			<StrictSearch>true</StrictSearch>
 			<ItemIds>
 				<string>Drill/StaticDrill</string>
-				<string>Drill/BasicStaticDrill</string>
-				<string>Drill/AdvancedStaticDrill</string>
 			</ItemIds>
 		</Category>
 		<Category xsi:type="MyObjectBuilder_GuiBlockCategoryDefinition">
@@ -25,8 +23,6 @@
 			<StrictSearch>true</StrictSearch>
 			<ItemIds>
 				<string>Drill/StaticDrill</string>
-				<string>Drill/BasicStaticDrill</string>
-				<string>Drill/AdvancedStaticDrill</string>
 			</ItemIds>
 		</Category>
 	</CategoryClasses>
